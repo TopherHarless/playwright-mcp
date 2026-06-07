@@ -61,6 +61,23 @@ function parseSteps(description) {
     .filter(Boolean);
 }
 
+// YouTube video ID → high-quality thumbnail (no auth required)
+function youtubeThumbnail(videoUrl) {
+  if (!videoUrl) return null;
+  const m = videoUrl.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? 'https://img.youtube.com/vi/' + m[1] + '/hqdefault.jpg' : null;
+}
+
+// Find an already-downloaded image for this slug (from nasm-scraper.js run)
+function existingImage(slug) {
+  const exts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+  for (const ext of exts) {
+    const p = path.join(IMG_DIR, slug + '.' + ext);
+    if (fs.existsSync(p)) return 'images/' + slug + '.' + ext;
+  }
+  return null;
+}
+
 async function main() {
   const capturesPath = path.join(DATA_DIR, 'api-captures.json');
   if (!fs.existsSync(capturesPath)) {
@@ -80,13 +97,14 @@ async function main() {
   console.log('Columns:', (apiData.columns || []).join(', '));
 
   const exercises = apiData.data.map((raw, i) => {
-    const slug     = slugify(raw['Title'] || ('exercise-' + i));
-    const steps    = parseSteps(raw['Description']);
+    const slug      = slugify(raw['Title'] || ('exercise-' + i));
+    const steps     = parseSteps(raw['Description']);
     const bodyParts = (raw['Body Part'] || '').split(',').map(s => s.trim()).filter(Boolean);
     const equipment = (raw['Equipment'] || '').split(',').map(s => s.trim()).filter(Boolean);
-    const thumbPath = raw['Video Thumbnail'] || '';
-    const thumbUrl  = thumbPath.startsWith('http') ? thumbPath
-                    : thumbPath ? 'https://www.nasm.org' + thumbPath : null;
+    const videoUrl  = raw['Video URL'] || null;
+    // prefer YouTube thumbnail (always accessible) over NASM CDN
+    const thumbnailUrl = youtubeThumbnail(videoUrl);
+    const localImage   = existingImage(slug); // reuse from first scraper run if present
     return {
       id: i + 1,
       slug,
@@ -95,29 +113,32 @@ async function main() {
       difficulty: raw['Difficulty'] || '',
       equipment,
       bodyParts,
-      videoUrl:   raw['Video URL'] || null,
-      thumbnailUrl: thumbUrl,
-      localImage: null,
+      videoUrl,
+      thumbnailUrl,
+      localImage,
       steps,
     };
   });
 
-  // Download thumbnails
-  console.log('\nDownloading thumbnails...');
+  // Download YouTube thumbnails (only for exercises that don't already have a local image)
+  console.log('\nDownloading YouTube thumbnails...');
+  let downloaded = 0, skipped = 0;
   for (let i = 0; i < exercises.length; i++) {
     const ex = exercises[i];
+    if (ex.localImage) { skipped++; continue; } // already have it
     if (!ex.thumbnailUrl) continue;
-    const ext  = (ex.thumbnailUrl.split('.').pop().split('?')[0] || 'jpg').slice(0, 5);
-    const dest = path.join(IMG_DIR, ex.slug + '.' + ext);
+    const dest = path.join(IMG_DIR, ex.slug + '.jpg');
     try {
       await downloadFile(ex.thumbnailUrl, dest);
-      ex.localImage = 'images/' + ex.slug + '.' + ext;
+      ex.localImage = 'images/' + ex.slug + '.jpg';
+      downloaded++;
       process.stdout.write('  [' + (i+1) + '/' + exercises.length + '] ' + ex.slug + ' OK\n');
     } catch (e) {
       process.stdout.write('  [' + (i+1) + '/' + exercises.length + '] ' + ex.slug + ' SKIP (' + e.message + ')\n');
     }
-    await sleep(150);
+    await sleep(100);
   }
+  console.log('  Downloaded: ' + downloaded + ', reused: ' + skipped);
 
   fs.writeFileSync(path.join(DATA_DIR, 'exercises.json'), JSON.stringify(exercises, null, 2));
   console.log('\nSaved', exercises.length, 'exercises to data/exercises.json');
