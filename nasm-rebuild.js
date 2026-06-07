@@ -231,7 +231,7 @@ function buildViewer(exercises) {
     '    const eqTags  = e.equipment.slice(0,2).map(function(q){ return \'<span class="tag tag-eq">\' + esc(q) + \'</span>\'; }).join("");',
     '    const diffTag = e.difficulty ? \'<span class="tag \' + diffCls + \'">\' + esc(e.difficulty) + \'</span>\' : "";',
     '    const vidBadge = e.videoUrl ? \'<div class="vid-badge">▶</div>\' : "";',
-    '    return \'<div class="card" onclick="openModal(\' + i + \')\'>\' + imgEl + vidBadge',
+    '    return \'<div class="card" onclick="openModal(\' + i + \')">\'  + imgEl + vidBadge',
     '      + \'<div class="card-body"><div class="card-title">\' + esc(e.title) + \'</div>\'',
     '      + \'<div class="tags">\' + diffTag + bpTags + eqTags + \'</div></div></div>\';',
     '  }).join("");',
