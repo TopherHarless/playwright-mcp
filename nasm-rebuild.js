@@ -158,13 +158,16 @@ async function main() {
     JSON.stringify({ total: exercises.length, difficulties, equipment, bodyParts }, null, 2));
 
   buildViewer(exercises);
+  buildViewer(exercises, true);
   console.log('\nDone! Open nasm-exercises/index.html in your browser.');
 }
 
 // ─── viewer ─────────────────────────────────────────────────────────────────
 // NOTE: backticks inside the embedded <script> are written as \` so they don't
 // close this Node.js template literal prematurely.
-function buildViewer(exercises) {
+function buildViewer(exercises, deployMode = false) {
+  const outDir = deployMode ? path.join(__dirname, 'docs') : OUT_DIR;
+  if (deployMode && !fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
   const dataJson = JSON.stringify(exercises);
 
   const scriptSrc = [
@@ -222,7 +225,7 @@ function buildViewer(exercises) {
     '  document.getElementById("countEl").textContent = _vis.length + " of " + EX.length + " exercises";',
     '  document.getElementById("empty").style.display = _vis.length ? "none" : "block";',
     '  grid.innerHTML = _vis.map(function(e, i) {',
-    '    const img = e.localImage || e.thumbnailUrl;',
+    '    const img = ' + (deployMode ? 'e.thumbnailUrl;' : 'e.localImage || e.thumbnailUrl;'),
     '    const imgEl = img',
     '      ? \'<img class="card-img" src="\' + esc(img) + \'" loading="lazy" onerror="this.remove()">\' ',
     '      : \'<div class="card-placeholder">\u{1F4AA}</div>\';',
@@ -410,8 +413,8 @@ ${scriptSrc}
 </body>
 </html>`;
 
-  fs.writeFileSync(path.join(OUT_DIR, 'index.html'), html);
-  console.log('Viewer written to nasm-exercises/index.html');
+  fs.writeFileSync(path.join(outDir, 'index.html'), html);
+  console.log('Viewer written to ' + (deployMode ? 'docs/index.html' : 'nasm-exercises/index.html'));
 }
 
 main().catch(e => { console.error('Fatal:', e); process.exit(1); });
