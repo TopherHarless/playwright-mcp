@@ -30,17 +30,52 @@ function normalize(str) {
   return (str || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
 }
 
+// Strip trailing 's' for plural-agnostic matching
+function singular(str) {
+  return str.endsWith('s') ? str.slice(0, -1) : str;
+}
+
+// Sort words alphabetically to match regardless of word order
+function wordSort(str) {
+  return str.split(' ').sort().join(' ');
+}
+
 const patch = {};
 for (const ex of nasmExercises) {
   const key = normalize(ex.title);
   if (!key) continue;
-  patch[key] = {
+  const data = {
     videoUrl:     ex.videoUrl     || null,
     thumbnailUrl: ex.thumbnailUrl || null,
     steps:        Array.isArray(ex.steps) ? ex.steps : [],
   };
+  patch[key] = data;
 }
 console.log(`Built NASM patch with ${Object.keys(patch).length} entries`);
+
+// Build secondary lookups for fuzzy matching
+const patchSingular  = {};  // singular form → data
+const patchWordSort  = {};  // word-sorted form → data
+for (const [key, data] of Object.entries(patch)) {
+  const s = singular(key);
+  if (s !== key) patchSingular[s] = patchSingular[s] || data;
+  const ws = wordSort(key);
+  if (ws !== key) patchWordSort[ws] = patchWordSort[ws] || data;
+}
+
+// Lookup NASM data for a Cowork exercise name using cascaded fuzzy matching
+function lookupPatch(name) {
+  const key = normalize(name);
+  if (patch[key])                        return { data: patch[key], how: 'exact' };
+  const s = singular(key);
+  if (patch[s])                          return { data: patch[s],   how: 'singular' };
+  if (patchSingular[s])                  return { data: patchSingular[s], how: 'singular' };
+  const ws = wordSort(key);
+  if (patchWordSort[ws])                 return { data: patchWordSort[ws], how: 'word-sort' };
+  const wss = wordSort(s);
+  if (patchWordSort[wss])                return { data: patchWordSort[wss], how: 'word-sort+singular' };
+  return null;
+}
 
 // ─── Read template ─────────────────────────────────────────────────────────────
 if (!fs.existsSync(TEMPLATE)) {
@@ -57,7 +92,28 @@ if (!template.includes(PATCH_MARKER)) {
   process.exit(1);
 }
 
-const patchCode = 'const NASM_PATCH = ' + JSON.stringify(patch, null, 2) + ';';
+// Build the effective patch keyed by normalized Cowork exercise names (what the browser uses)
+const nameRx = /\{id:\d+,name:"([^"]+)"/g;
+let m;
+const effectivePatch = {};
+const matchedNames = [];
+const unmatchedNasm = new Set(Object.keys(patch));
+
+while ((m = nameRx.exec(template)) !== null) {
+  const coworkName = m[1];
+  const result = lookupPatch(coworkName);
+  if (result) {
+    const coworkKey = normalize(coworkName);
+    effectivePatch[coworkKey] = result.data;
+    matchedNames.push({ name: coworkName, how: result.how });
+    // Mark the NASM source as used
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === result.data) { unmatchedNasm.delete(k); break; }
+    }
+  }
+}
+
+const patchCode = 'const NASM_PATCH = ' + JSON.stringify(effectivePatch, null, 2) + ';';
 const merged = template.replace(PATCH_MARKER, patchCode);
 
 // ─── Write outputs ─────────────────────────────────────────────────────────────
@@ -74,23 +130,18 @@ writeOut(OUT_DEPLOY, merged);
 
 // ─── Report match stats ────────────────────────────────────────────────────────
 if (nasmExercises.length > 0) {
-  const nameRx = /\{id:\d+,name:"([^"]+)"/g;
-  let m;
-  let total = 0, matchedNames = [];
-  while ((m = nameRx.exec(template)) !== null) {
-    total++;
-    if (patch[normalize(m[1])]) matchedNames.push(m[1]);
-  }
-  console.log(`\nMatched ${matchedNames.length} / ${total} exercises with NASM video + steps`);
+  console.log(`\nMatched ${matchedNames.length} / ${Object.keys(patch).length} NASM exercises into Cowork library`);
   if (matchedNames.length > 0) {
     console.log('Matched exercises:');
-    matchedNames.forEach(n => console.log('  ✓', n));
+    matchedNames.forEach(({ name, how }) => {
+      const tag = how !== 'exact' ? ` (${how})` : '';
+      console.log(`  ✓ ${name}${tag}`);
+    });
   }
 
-  const unmatched = Object.keys(patch).filter(k => !matchedNames.some(n => normalize(n) === k));
-  if (unmatched.length > 0) {
-    console.log(`\nNASM exercises with no Cowork match (${unmatched.length}):`);
-    unmatched.forEach(k => console.log('  ✗', k));
+  if (unmatchedNasm.size > 0) {
+    console.log(`\nNASM exercises with no Cowork match (${unmatchedNasm.size}):`);
+    [...unmatchedNasm].forEach(k => console.log('  ✗', k));
   }
 }
 
