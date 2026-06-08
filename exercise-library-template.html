@@ -122,6 +122,7 @@ tr:hover td{background:var(--surface2)}
 .drawer-close{background:none;border:none;color:var(--text2);font-size:24px;cursor:pointer;padding:0;line-height:1}
 .mobile-filter-btn{display:none;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;white-space:nowrap}
 .filter-badge{background:var(--accent);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700}
+.mobile-builder-btn{display:none;align-items:center;gap:5px;background:var(--accent2);border:none;color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:13px;font-weight:700;margin-left:auto;white-space:nowrap}
 /* ── RESPONSIVE ── */
 @media(max-width:768px){
   aside{display:flex;flex-direction:column;position:fixed;bottom:0;left:0;right:0;width:100%;max-height:82vh;min-width:0;border-right:none;border-top:1px solid var(--border);border-radius:16px 16px 0 0;transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);z-index:200;overflow-y:auto}
@@ -129,6 +130,9 @@ tr:hover td{background:var(--surface2)}
   .drawer-handle{display:flex}
   .exercise-grid{grid-template-columns:1fr}
   .mobile-filter-btn{display:flex}
+  .mobile-builder-btn{display:flex}
+  .header-right{display:none}
+  #searchBox{max-width:none}
   .layout{height:auto;min-height:calc(100vh - 55px)}
 }
 .card-thumb{width:calc(100% + 28px);aspect-ratio:16/9;object-fit:cover;display:block;margin:-14px -14px 10px;border-radius:var(--radius) var(--radius) 0 0;background:var(--surface2)}
@@ -221,6 +225,7 @@ tr:hover td{background:var(--surface2)}
       <option value="group">Sort: Muscle Group</option>
       <option value="difficulty">Sort: Difficulty</option>
     </select>
+    <button class="mobile-builder-btn" onclick="toggleBuilder()">🏋️ <span id="builderCountMobile">0</span></button>
   </div>
   <div id="exerciseContainer"></div>
 </main>
@@ -954,7 +959,10 @@ function toggleWorkout(id) {
 }
 
 function updateBuilderUI() {
-  document.getElementById('builderCount').textContent = state.workout.length;
+  const n = state.workout.length;
+  document.getElementById('builderCount').textContent = n;
+  const mob = document.getElementById('builderCountMobile');
+  if (mob) mob.textContent = n;
   const list = document.getElementById('builderList');
   if (state.workout.length === 0) {
     list.innerHTML = '<div class="builder-empty">Add exercises using the <strong>+ Add</strong> button on any card.<br><br>Your workout will appear here.</div>';
