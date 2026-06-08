@@ -114,10 +114,22 @@ tr:hover td{background:var(--surface2)}
   main{overflow:visible}
   .exercise-card{break-inside:avoid;page-break-inside:avoid}
 }
+/* ── MOBILE FILTER DRAWER ── */
+.filter-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199}
+.filter-overlay.open{display:block}
+.drawer-handle{display:none;justify-content:space-between;align-items:center;padding:0 0 14px;border-bottom:1px solid var(--border);margin-bottom:6px;flex-shrink:0}
+.drawer-handle h3{font-size:15px;font-weight:700;color:var(--text);margin:0}
+.drawer-close{background:none;border:none;color:var(--text2);font-size:24px;cursor:pointer;padding:0;line-height:1}
+.mobile-filter-btn{display:none;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;white-space:nowrap}
+.filter-badge{background:var(--accent);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700}
 /* ── RESPONSIVE ── */
 @media(max-width:768px){
-  aside{display:none}
+  aside{display:flex;flex-direction:column;position:fixed;bottom:0;left:0;right:0;width:100%;max-height:82vh;min-width:0;border-right:none;border-top:1px solid var(--border);border-radius:16px 16px 0 0;transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);z-index:200;overflow-y:auto}
+  aside.open{transform:translateY(0)}
+  .drawer-handle{display:flex}
   .exercise-grid{grid-template-columns:1fr}
+  .mobile-filter-btn{display:flex}
+  .layout{height:auto;min-height:calc(100vh - 55px)}
 }
 .card-thumb{width:calc(100% + 28px);aspect-ratio:16/9;object-fit:cover;display:block;margin:-14px -14px 10px;border-radius:var(--radius) var(--radius) 0 0;background:var(--surface2)}
 .steps-list{padding-left:18px;margin:4px 0}
@@ -135,9 +147,14 @@ tr:hover td{background:var(--surface2)}
     <button class="builder-toggle" onclick="toggleBuilder()">🏋️ Workout Builder (<span id="builderCount">0</span>)</button>
   </div>
 </header>
+<div class="filter-overlay" id="filterOverlay" onclick="closeMobileFilters()"></div>
 <div class="layout">
 <!-- SIDEBAR -->
 <aside id="sidebar">
+  <div class="drawer-handle">
+    <h3>⊟ Filters</h3>
+    <button class="drawer-close" onclick="closeMobileFilters()">×</button>
+  </div>
   <div class="filter-section">
     <h4>🔍 Active Injuries — Hides risky exercises</h4>
     <div class="chip-group" id="injuryFilters">
@@ -196,6 +213,7 @@ tr:hover td{background:var(--surface2)}
 <!-- MAIN CONTENT -->
 <main id="main">
   <div class="toolbar">
+    <button class="mobile-filter-btn" id="mobileFilterBtn" onclick="toggleMobileFilters()">⊟ Filters<span class="filter-badge" id="filterBadge" style="display:none">0</span></button>
     <button class="view-btn active" id="btnGrid" onclick="setView('grid')">⊞ Grid</button>
     <button class="view-btn" id="btnTable" onclick="setView('table')">☰ Table</button>
     <select class="sort-select" id="sortSelect" onchange="applyFilters()">
@@ -839,6 +857,18 @@ function applyFilters() {
   document.getElementById('visibleCount').textContent = filtered.length;
   if (state.view === 'grid') renderGrid(filtered);
   else renderTable(filtered);
+  const count = state.injuries.size + state.groups.size + state.equip.size +
+                state.diff.size + state.patterns.size + (state.uni ? 1 : 0) + (_hasVideo ? 1 : 0);
+  const badge = document.getElementById('filterBadge');
+  if (badge) { badge.textContent = count; badge.style.display = count > 0 ? '' : 'none'; }
+}
+function toggleMobileFilters() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('filterOverlay').classList.toggle('open');
+}
+function closeMobileFilters() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('filterOverlay').classList.remove('open');
 }
 
 // ─── RENDERING ────────────────────────────────────────────────────────────────
